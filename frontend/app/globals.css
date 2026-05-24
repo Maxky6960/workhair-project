@@ -1,0 +1,8 @@
+@import "../website-markdown/src/styles/tailwind.css";
+@import "../website-markdown/src/styles/theme.css";
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
