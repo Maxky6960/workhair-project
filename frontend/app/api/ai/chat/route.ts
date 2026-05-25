@@ -15,13 +15,28 @@ type AdminAiSettings = {
   rag_content: string | null;
 };
 
+type ShopSettings = {
+  shop_name: string | null;
+  address: string | null;
+  phone: string | null;
+  open_hours: string | null;
+  line_id: string | null;
+};
+
+type TodayRevenueSummary = {
+  totalRevenue: number;
+  completedCount: number;
+  bookedCount: number;
+  pendingCount: number;
+};
+
 type EmbeddingResponse = {
   embedding?: { values?: number[] };
   error?: { message?: string };
 };
 
-const fallbackModels = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
-const defaultCustomerModel = (process.env.GOOGLE_AI_MODEL_NAME || "gemini-2.5-flash-lite").toLowerCase();
+const fallbackModels = ["gemini-3.1-flash-lite", "gemini-3.1-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"];
+const defaultCustomerModel = (process.env.GOOGLE_AI_MODEL_NAME || "gemini-3.1-flash-lite").toLowerCase();
 const embeddingModel = "text-embedding-004";
 
 const systemPrompts: Record<ChatMode, string> = {
@@ -38,6 +53,84 @@ const systemPrompts: Record<ChatMode, string> = {
 };
 
 const normalizeModelName = (value: string | null | undefined) => (value || "").trim().toLowerCase();
+
+const shouldHandleCustomerLocation = (message: string) => {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("ที่ตั้ง") ||
+    lower.includes("ที่อยู่") ||
+    lower.includes("พิกัด") ||
+    lower.includes("location") ||
+    lower.includes("map")
+  );
+};
+
+const shouldHandleTodayRevenue = (message: string) => {
+  const lower = message.toLowerCase();
+  const hasRevenueWord = lower.includes("รายได้") || lower.includes("ยอด") || lower.includes("revenue") || lower.includes("sales");
+  const hasTodayWord = lower.includes("วันนี้") || lower.includes("today");
+  return hasRevenueWord && hasTodayWord;
+};
+
+const getBangkokDateRangeIso = () => {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+
+  const year = Number(parts.find((part) => part.type === "year")?.value || "0");
+  const month = Number(parts.find((part) => part.type === "month")?.value || "0");
+  const day = Number(parts.find((part) => part.type === "day")?.value || "0");
+
+  const bangkokOffsetMs = 7 * 60 * 60 * 1000;
+  const startUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0) - bangkokOffsetMs;
+  const endUtcMs = startUtcMs + 24 * 60 * 60 * 1000;
+
+  return {
+    startIso: new Date(startUtcMs).toISOString(),
+    endIso: new Date(endUtcMs).toISOString(),
+  };
+};
+
+async function getTodayRevenueSummary(): Promise<TodayRevenueSummary | null> {
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  if (!authData.user) return null;
+
+  const { data: isAdmin, error: isAdminError } = await supabase.rpc("is_current_user_admin");
+  if (isAdminError || isAdmin !== true) return null;
+
+  const { startIso, endIso } = getBangkokDateRangeIso();
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("service_price,status")
+    .gte("appointment_at", startIso)
+    .lt("appointment_at", endIso);
+
+  if (error || !data) return null;
+
+  let totalRevenue = 0;
+  let completedCount = 0;
+  let pendingCount = 0;
+
+  for (const row of data) {
+    if (row.status === "completed") {
+      totalRevenue += Number(row.service_price || 0);
+      completedCount += 1;
+    }
+    if (row.status === "pending") pendingCount += 1;
+  }
+
+  return {
+    totalRevenue,
+    completedCount,
+    bookedCount: data.length,
+    pendingCount,
+  };
+}
 
 const chunkText = (text: string) => {
   const paragraphs = text.split(/\n\s*\n/g).map((part) => part.trim()).filter(Boolean);
@@ -100,8 +193,8 @@ async function embedText(apiKey: string, text: string) {
 function buildModelCandidates(selectedModel: string, message: string) {
   if (!selectedModel || selectedModel === "auto") {
     return message.length > 900
-      ? ["gemini-1.5-flash", "gemini-2.5-flash-lite"]
-      : ["gemini-2.5-flash-lite", "gemini-1.5-flash"];
+      ? ["gemini-3.1-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"]
+      : ["gemini-3.1-flash-lite", "gemini-3.1-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"];
   }
 
   return [selectedModel, ...fallbackModels.filter((model) => model !== selectedModel)];
@@ -158,6 +251,35 @@ async function loadAdminSettings() {
   return data || null;
 }
 
+async function loadShopSettings() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("shop_settings")
+    .select("shop_name,address,phone,open_hours,line_id")
+    .eq("id", 1)
+    .maybeSingle<ShopSettings>();
+
+  return data || null;
+}
+
+const formatShopInfoForReply = (shop: ShopSettings | null) => {
+  const shopName = shop?.shop_name?.trim() || "Workhair";
+  const address = shop?.address?.trim();
+  const phone = shop?.phone?.trim();
+  const lineId = shop?.line_id?.trim();
+
+  if (!address) {
+    return `${shopName} ยังไม่ได้ตั้งค่าที่อยู่ร้านแบบละเอียดในระบบตอนนี้ค่ะ รบกวนติดต่อร้านโดยตรง${phone ? `ที่ ${phone}` : ""} เพื่อยืนยันพิกัดล่าสุดนะคะ`;
+  }
+
+  return [
+    `ที่ตั้งร้าน ${shopName}:`,
+    address,
+    phone ? `โทร: ${phone}` : "",
+    lineId ? `Line: ${lineId}` : "",
+  ].filter(Boolean).join("\n");
+};
+
 async function buildRagContext(apiKey: string, prompt: string, ragContent: string) {
   const chunks = chunkText(ragContent);
   if (!chunks.length) return "";
@@ -199,7 +321,26 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Message is required" }, { status: 400 });
   }
 
+  if (mode === "admin" && shouldHandleTodayRevenue(message)) {
+    const todaySummary = await getTodayRevenueSummary();
+    if (todaySummary) {
+      return Response.json({
+        reply: `สรุปรายได้วันนี้ (เฉพาะคิวที่เสร็จสิ้น): ${todaySummary.totalRevenue.toLocaleString("th-TH")} บาท\nคิวเสร็จสิ้น: ${todaySummary.completedCount} คิว | คิวทั้งหมดวันนี้: ${todaySummary.bookedCount} คิว | รอยืนยัน: ${todaySummary.pendingCount} คิว`,
+        fromData: true,
+      });
+    }
+  }
+
+  if (mode === "customer" && shouldHandleCustomerLocation(message)) {
+    const shopSettings = await loadShopSettings();
+    return Response.json({
+      reply: formatShopInfoForReply(shopSettings),
+      fromData: true,
+    });
+  }
+
   const adminSettings = mode === "admin" ? await loadAdminSettings() : null;
+  const shopSettings = mode === "customer" ? await loadShopSettings() : null;
   const selectedModel = mode === "admin"
     ? normalizeModelName(adminSettings?.ai_model_name || process.env.GOOGLE_AI_MODEL_NAME)
     : defaultCustomerModel;
@@ -226,6 +367,9 @@ export async function POST(request: NextRequest) {
 
   const systemInstruction = [
     systemPrompts[mode],
+    mode === "customer" && shopSettings
+      ? `\n\nข้อมูลร้านจากฐานข้อมูล (ให้ยึดข้อมูลนี้ก่อน):\n- ชื่อร้าน: ${shopSettings.shop_name || "Workhair"}\n- ที่อยู่: ${shopSettings.address || "ไม่พบข้อมูล"}\n- เบอร์โทร: ${shopSettings.phone || "ไม่พบข้อมูล"}\n- Line: ${shopSettings.line_id || "ไม่พบข้อมูล"}\n- เวลาเปิดปิด(raw): ${shopSettings.open_hours || "ไม่พบข้อมูล"}`
+      : "",
     customPrompt ? `\n\nSystem prompt from admin settings:\n${customPrompt}` : "",
     ragContext ? `\n\nRAG context (use only if relevant):\n${ragContext}` : "",
   ].join("");
