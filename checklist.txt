@@ -1,0 +1,33 @@
+# Pivot & Domain
+[X] เลือก business domain ใหม่ที่ไม่ซ้ำกับ cohort เพื่อน
+[X] ทำ Pivot Worksheet (PIVOT.md) ครบ 3 ข้อ:
+- Domain + ความเชื่อมโยงกับตัวเอง
+- ลูกค้า + ปัญหา 3 ข้อ
+- Differentiation ที่ต่างจาก MilkLab° template
+
+# Adapt Code
+[X] Knowledge Base: เปลี่ยนไฟล์เป็นข้อมูลจริงของธุรกิจใหม่
+[X] System Prompt: ปรับให้เป็นผู้ช่วยของธุรกิจใหม่
+[X] UI Streamlit: เปลี่ยนชื่อและ branding ให้ตรงกับ domain
+[ ] Caption Generator: ปรับให้เข้ากับบริการร้านทำผม
+[X] Sales Logger: ปรับให้เข้ากับบริการร้านทำผมและบันทึกลง Google Sheets
+[X] Repository Name (optional): เปลี่ยนชื่อ repo ให้ตรงกับธุรกิจ
+[ ] Claim Namecheap Free Domain (optional)
+
+# Polish & Self-Checklist
+[X] UI/UX สะอาด ไม่มี debug output
+[X] Error message อ่านเข้าใจง่าย
+[X] ลบ print() debug และ hard-coded API key
+[X] requirements.txt ครบถ้วน
+[X] README.md อธิบายระบบของ domain ใหม่ + วิธีรัน local setup
+[X] ใส่ link ไปยัง PIVOT.md ใน README
+[X] Deploy URL ใช้งานได้จริง
+[X] ไม่มี .env หรือไฟล์ sensitive ใน git history
+
+# Cohort Peer Review
+[ ] เปิด Pull Request พร้อม deploy URL
+[ ] Review งานเพื่อน 1 คนตาม rubric (Demo URL, Pivot depth, คำแนะนำ)
+[ ] ตอบ comment และแก้ไขตาม feedback ถ้าจำเป็น
+
+# Cost Awareness
+[X] ตรวจ quota ของ Gemini API, HuggingFace Spaces, Supabase (ถ้าใช้)
