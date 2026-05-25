@@ -1,0 +1,16 @@
+services:
+  frontend:
+    container_name: workhair-frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: workhair-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SITE_URL: https://workhairstyle.kxrn.online
+      NEXT_PUBLIC_APP_URL: https://workhairstyle.kxrn.online
