@@ -1,4 +1,4 @@
-import { requireAdminServer } from "@/lib/auth/admin";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -13,8 +13,22 @@ const makeServiceClient = () => {
   });
 };
 
+async function requireAdmin() {
+  const supabase = await createServerClient();
+  const { data: authData } = await supabase.auth.getUser();
+
+  if (!authData.user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+
+  const { data: isAdmin, error } = await supabase.rpc("is_current_user_admin");
+  if (error || isAdmin !== true) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+
+  return { supabase, adminUserId: authData.user.id };
+}
+
 export async function GET() {
-  const auth = await requireAdminServer();
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
   const [{ data: shop }, { data: admin }] = await Promise.all([
@@ -26,7 +40,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const auth = await requireAdminServer();
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
   let body: {

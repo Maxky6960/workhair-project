@@ -1,8 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireAdminServer } from "@/lib/auth/admin";
+import { createClient } from "@/lib/supabase/server";
+
+async function requireAdmin() {
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+
+  if (!authData.user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+
+  const { data: isAdmin, error } = await supabase.rpc("is_current_user_admin");
+  if (error || isAdmin !== true) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+
+  return { supabase };
+}
 
 export async function GET() {
-  const auth = await requireAdminServer();
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
   const { data, error } = await auth.supabase
@@ -15,7 +27,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdminServer();
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
   const body = await request.json().catch(() => null) as
@@ -41,7 +53,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const auth = await requireAdminServer();
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
   const url = new URL(request.url);
@@ -58,7 +70,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const auth = await requireAdminServer();
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
   const url = new URL(request.url);
