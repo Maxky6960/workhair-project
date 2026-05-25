@@ -161,7 +161,7 @@ export function AdminMenuPage() {
                 <tr key={item.id} style={{ borderBottom: "1px solid rgba(192,133,82,0.1)", backgroundColor: i % 2 === 0 ? "transparent" : "rgba(192,133,82,0.02)" }}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <Image src={item.image_url || "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&fit=crop"} alt={item.name} width={40} height={40} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                      <Image src={item.image_url || "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&fit=crop"} alt={item.name} width={40} height={40} unoptimized className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                       <span style={{ color: "#4B2E2B", fontWeight: 500 }}>{item.name}</span>
                     </div>
                   </td>
