@@ -17,5 +17,3 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_SITE_URL: https://workhairstyle.kxrn.online
       NEXT_PUBLIC_APP_URL: https://workhairstyle.kxrn.online
-    networks:
-      - main-network
