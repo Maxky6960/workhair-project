@@ -1,22 +1,12 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdminServer } from "@/lib/auth/admin";
 
 const escapeCsv = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: authData } = await supabase.auth.getUser();
-  const userId = authData.user?.id;
-
-  if (!userId) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  const { data: isAdmin, error: adminError } = await supabase.rpc("is_current_user_admin");
-
-  if (adminError || isAdmin !== true) {
-    return new Response("Forbidden", { status: 403 });
-  }
+  const auth = await requireAdminServer();
+  if ("error" in auth) return auth.error;
+  const { supabase } = auth;
 
   const params = request.nextUrl.searchParams;
   const month = Number(params.get("month") || 0);
