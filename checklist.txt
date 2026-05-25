@@ -9,7 +9,7 @@
 [X] Knowledge Base: เปลี่ยนไฟล์เป็นข้อมูลจริงของธุรกิจใหม่
 [X] System Prompt: ปรับให้เป็นผู้ช่วยของธุรกิจใหม่
 [X] UI Streamlit: เปลี่ยนชื่อและ branding ให้ตรงกับ domain
-[ ] Caption Generator: ปรับให้เข้ากับบริการร้านทำผม
+[X] Caption Generator: ปรับให้เข้ากับบริการร้านทำผม
 [X] Sales Logger: ปรับให้เข้ากับบริการร้านทำผมและบันทึกลง Google Sheets
 [X] Repository Name (optional): เปลี่ยนชื่อ repo ให้ตรงกับธุรกิจ
 [ ] Claim Namecheap Free Domain (optional)
