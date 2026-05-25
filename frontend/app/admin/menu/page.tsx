@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminMenuPage } from "@/website-markdown/src/app/components/AdminMenuPage";
+import { AdminMenuPage } from "@/components/AdminMenuPage";
 
 export default function Page() {
   return <AdminMenuPage />;

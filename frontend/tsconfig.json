@@ -30,12 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": [
-    "node_modules",
-    "website-markdown/src/app/App.tsx",
-    "website-markdown/src/app/routes.ts",
-    "website-markdown/src/main.tsx",
-    "website-markdown/src/app/components/ui/**/*",
-    "website-markdown/vite.config.ts"
-  ]
+  "exclude": ["node_modules", "components/ui/**/*"]
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { HomePage } from "@/website-markdown/src/app/components/HomePage";
+import { HomePage } from "@/components/HomePage";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;

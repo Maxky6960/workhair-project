@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { BookingConfirmedPage } from "@/website-markdown/src/app/components/BookingConfirmedPage";
+import { BookingConfirmedPage } from "@/components/BookingConfirmedPage";
 
 export default function Page() {
   return (

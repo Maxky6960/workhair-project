@@ -1,4 +1,4 @@
-import { LoginPage } from "@/website-markdown/src/app/components/LoginPage";
+import { LoginPage } from "@/components/LoginPage";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;

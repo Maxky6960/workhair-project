@@ -37,3 +37,5 @@ next-env.d.ts
 
 # markdown figma
 /frontend/website-markdown
+
+*.json
