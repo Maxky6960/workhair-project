@@ -10,6 +10,12 @@ import { createClient } from "@/lib/supabase/client";
 interface LoginForm { email: string; password: string; }
 interface RegisterForm { name: string; email: string; phone: string; password: string; confirmPassword: string; }
 
+type SupabaseAuthErrorLike = {
+  code?: string;
+  message?: string;
+  status?: number;
+};
+
 interface LoginPageProps {
   defaultTab?: "login" | "register";
   initialErrorMessage?: string | null;
@@ -48,6 +54,31 @@ export function LoginPage({ defaultTab = "login", initialErrorMessage = null, re
 
   const visibleErrorMessage = errorMessage || initialErrorMessage;
 
+  const getAuthErrorMessage = (error: SupabaseAuthErrorLike | null, mode: "login" | "register") => {
+    if (!error) {
+      return mode === "login"
+        ? "เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบข้อมูล"
+        : "สมัครสมาชิกไม่สำเร็จ";
+    }
+
+    const code = error.code?.toLowerCase() || "";
+    const message = error.message?.toLowerCase() || "";
+
+    if (code === "over_email_send_rate_limit" || error.status === 429 || message.includes("email rate limit exceeded")) {
+      return "ส่งอีเมลยืนยันบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง";
+    }
+
+    if (code === "user_already_registered" || message.includes("user already registered")) {
+      return "อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบแทน";
+    }
+
+    if (mode === "login") {
+      return "เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบอีเมลและรหัสผ่าน";
+    }
+
+    return error.message || "สมัครสมาชิกไม่สำเร็จ";
+  };
+
   const onLogin = async (data: LoginForm) => {
     setLoading(true);
     setErrorMessage(null);
@@ -72,7 +103,7 @@ export function LoginPage({ defaultTab = "login", initialErrorMessage = null, re
     });
 
     if (error) {
-      setErrorMessage("เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบข้อมูล");
+      setErrorMessage(getAuthErrorMessage(error, "login"));
       setLoading(false);
       return;
     }
@@ -114,7 +145,7 @@ export function LoginPage({ defaultTab = "login", initialErrorMessage = null, re
     });
 
     if (error) {
-      setErrorMessage("สมัครสมาชิกไม่สำเร็จ");
+      setErrorMessage(getAuthErrorMessage(error, "register"));
       setLoading(false);
       return;
     }
