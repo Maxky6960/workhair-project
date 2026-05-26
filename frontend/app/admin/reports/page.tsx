@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminReports } from "@/website-markdown/src/app/components/AdminReports";
+import { AdminReports } from "@/components/AdminReports";
 
 export default function Page() {
   return <AdminReports />;

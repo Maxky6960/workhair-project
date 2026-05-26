@@ -1,6 +1,6 @@
 "use client";
 
-import { MenuPage } from "@/website-markdown/src/app/components/MenuPage";
+import { MenuPage } from "@/components/MenuPage";
 
 export default function Page() {
   return <MenuPage />;

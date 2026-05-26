@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminQueue } from "@/website-markdown/src/app/components/AdminQueue";
+import { AdminQueue } from "@/components/AdminQueue";
 
 export default function Page() {
   return <AdminQueue />;

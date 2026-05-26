@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { BookPage } from "@/website-markdown/src/app/components/BookPage";
+import { BookPage } from "@/components/BookPage";
 
 export default function Page() {
   return (

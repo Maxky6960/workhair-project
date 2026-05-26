@@ -1,6 +1,6 @@
 "use client";
 
-import { CustomerLayout } from "@/website-markdown/src/app/components/CustomerLayout";
+import { CustomerLayout } from "@/components/CustomerLayout";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return <CustomerLayout>{children}</CustomerLayout>;

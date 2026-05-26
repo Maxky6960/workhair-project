@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminSettings } from "@/website-markdown/src/app/components/AdminSettings";
+import { AdminSettings } from "@/components/AdminSettings";
 
 export default function Page() {
   return <AdminSettings />;
