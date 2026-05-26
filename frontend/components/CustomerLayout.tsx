@@ -23,9 +23,9 @@ export function CustomerLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    const supabase = createClient();
 
     const loadAuthState = async () => {
-      const supabase = createClient();
       const { data: authData } = await supabase.auth.getUser();
       const user = authData.user;
 
@@ -54,8 +54,13 @@ export function CustomerLayout({ children }: { children: React.ReactNode }) {
 
     void loadAuthState();
 
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      void loadAuthState();
+    });
+
     return () => {
       active = false;
+      listener.subscription.unsubscribe();
     };
   }, []);
 
