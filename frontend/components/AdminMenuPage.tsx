@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, X } from "lucide-react";
 
 interface ServiceItem {
   id: string;
@@ -17,6 +17,9 @@ export function AdminMenuPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceItem | null>(null);
   const [form, setForm] = useState({ name: "", category: "men" as "men" | "women" | "other", price: "", duration: "", description: "", imageUrl: "" });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadServices = async () => {
@@ -46,6 +49,9 @@ export function AdminMenuPage() {
   const openAdd = () => {
     setEditing(null);
     setForm({ name: "", category: "men", price: "", duration: "", description: "", imageUrl: "" });
+    setImageFile(null);
+    setImagePreview("");
+    setErrorMessage(null);
     setModalOpen(true);
   };
 
@@ -59,7 +65,52 @@ export function AdminMenuPage() {
       description: item.description || "",
       imageUrl: item.image_url || "",
     });
+    setImageFile(null);
+    setImagePreview(item.image_url || "");
+    setErrorMessage(null);
     setModalOpen(true);
+  };
+
+  const handleImageFileChange = (file: File | undefined) => {
+    setErrorMessage(null);
+
+    if (!file) {
+      setImageFile(null);
+      setImagePreview(form.imageUrl);
+      return;
+    }
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setErrorMessage("อัปโหลดได้เฉพาะไฟล์ JPG, PNG หรือ WebP");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("รูปภาพต้องมีขนาดไม่เกิน 5MB");
+      return;
+    }
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const uploadImage = async () => {
+    if (!imageFile) return form.imageUrl || null;
+
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const response = await fetch("/api/admin/services/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => null) as { imageUrl?: string; error?: string } | null;
+    if (!response.ok || !payload?.imageUrl) {
+      throw new Error(payload?.error || "อัปโหลดรูปไม่สำเร็จ");
+    }
+
+    return payload.imageUrl;
   };
 
   const deleteItem = async (id: string) => {
@@ -73,42 +124,55 @@ export function AdminMenuPage() {
 
   const saveForm = async () => {
     setErrorMessage(null);
+    if (saving) return;
     if (!form.name || !form.price) return;
-    const payload = {
-      name: form.name,
-      category: form.category,
-      price: Number(form.price),
-      duration_minutes: Number(form.duration || 30),
-      description: form.description || null,
-      image_url: form.imageUrl || null,
-      is_active: true,
-    };
+    setSaving(true);
 
-    if (editing) {
-      const response = await fetch(`/api/admin/services?id=${encodeURIComponent(editing.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    try {
+      const imageUrl = await uploadImage();
+      const payload = {
+        name: form.name,
+        category: form.category,
+        price: Number(form.price),
+        duration_minutes: Number(form.duration || 30),
+        description: form.description || null,
+        image_url: imageUrl,
+        is_active: true,
+      };
 
-      if (!response.ok) {
-        setErrorMessage("บันทึกไม่สำเร็จ");
-        return;
+      if (editing) {
+        const response = await fetch(`/api/admin/services?id=${encodeURIComponent(editing.id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          setErrorMessage("บันทึกไม่สำเร็จ");
+          return;
+        }
+      } else {
+        const response = await fetch("/api/admin/services", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          setErrorMessage("เพิ่มเมนูไม่สำเร็จ");
+          return;
+        }
       }
-    } else {
-      const response = await fetch("/api/admin/services", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
 
-      if (!response.ok) {
-        setErrorMessage("เพิ่มเมนูไม่สำเร็จ");
-        return;
-      }
+      await loadServices();
+      setModalOpen(false);
+      setImageFile(null);
+      setImagePreview("");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "บันทึกไม่สำเร็จ");
+    } finally {
+      setSaving(false);
     }
-    await loadServices();
-    setModalOpen(false);
   };
 
   const inputClass = "w-full px-3 py-2.5 rounded-xl text-sm outline-none";
@@ -195,12 +259,12 @@ export function AdminMenuPage() {
       {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(75,46,43,0.4)" }}>
-          <div className="w-full max-w-md rounded-3xl overflow-hidden" style={{ backgroundColor: "#ffffff" }}>
+          <div className="w-full max-w-md max-h-[90vh] overflow-hidden rounded-3xl flex flex-col" style={{ backgroundColor: "#ffffff" }}>
             <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "rgba(192,133,82,0.15)" }}>
               <h3 style={{ color: "#4B2E2B", fontWeight: 600 }}>{editing ? "แก้ไขทรงผม" : "เพิ่มทรงผม"}</h3>
               <button onClick={() => setModalOpen(false)}><X className="w-5 h-5" style={{ color: "#8C5A3C" }} /></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="text-xs mb-1.5 block" style={{ color: "#8C5A3C" }}>ชื่อทรงผม</label>
                 <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="ชื่อทรงผม" className={inputClass} style={inputStyle} />
@@ -228,15 +292,42 @@ export function AdminMenuPage() {
                 <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} placeholder="คำอธิบายสั้นๆ" className={inputClass + " resize-none"} style={inputStyle} />
               </div>
               <div>
-                <label className="text-xs mb-1.5 block" style={{ color: "#8C5A3C" }}>รูปภาพ URL</label>
-                <input value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="https://..." className={inputClass} style={inputStyle} />
+                <label className="text-xs mb-1.5 block" style={{ color: "#8C5A3C" }}>รูปภาพ</label>
+                <div className="space-y-3">
+                  {imagePreview && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imagePreview} alt="ตัวอย่างรูปทรงผม" className="h-36 w-full rounded-xl object-cover" />
+                  )}
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm transition-opacity hover:opacity-85" style={{ backgroundColor: "#C0855220", color: "#C08552", border: "1.5px dashed rgba(192,133,82,0.45)" }}>
+                    <Upload className="w-4 h-4" />
+                    เลือกรูปจากเครื่อง
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={e => handleImageFileChange(e.target.files?.[0])}
+                    />
+                  </label>
+                  <input
+                    value={form.imageUrl}
+                    onChange={e => {
+                      const imageUrl = e.target.value;
+                      setForm(f => ({ ...f, imageUrl }));
+                      setImageFile(null);
+                      setImagePreview(imageUrl);
+                    }}
+                    placeholder="หรือวาง URL รูปภาพ https://..."
+                    className={inputClass}
+                    style={inputStyle}
+                  />
+                </div>
               </div>
               {errorMessage && <p className="text-xs" style={{ color: "#d4183d" }}>{errorMessage}</p>}
             </div>
             <div className="flex gap-3 px-6 pb-6">
-              <button onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-xl text-sm" style={{ backgroundColor: "#f5e9db", color: "#8C5A3C" }}>ยกเลิก</button>
-              <button onClick={saveForm} className="flex-1 py-2.5 rounded-xl text-sm" style={{ backgroundColor: "#C08552", color: "#ffffff", fontWeight: 600 }}>
-                {editing ? "บันทึก" : "เพิ่มเมนู"}
+              <button disabled={saving} onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-xl text-sm disabled:opacity-60" style={{ backgroundColor: "#f5e9db", color: "#8C5A3C" }}>ยกเลิก</button>
+              <button disabled={saving} onClick={saveForm} className="flex-1 py-2.5 rounded-xl text-sm disabled:opacity-60" style={{ backgroundColor: "#C08552", color: "#ffffff", fontWeight: 600 }}>
+                {saving ? "กำลังบันทึก..." : editing ? "บันทึก" : "เพิ่มเมนู"}
               </button>
             </div>
           </div>

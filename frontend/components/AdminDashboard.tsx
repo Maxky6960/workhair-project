@@ -1,7 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { TrendingUp, Users, ArrowUp, Scissors } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { createClient } from "@/lib/supabase/client";
+
+type Booking = {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  service_name: string;
+  service_price: number;
+  appointment_at: string;
+  status: string;
+};
+
+const bangkokDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Bangkok",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function getBangkokDateKey(value: string | Date) {
+  const parts = bangkokDateFormatter.formatToParts(new Date(value));
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+}
 
 const statusColor: Record<string, string> = {
   pending: "#C08552",
@@ -19,42 +43,62 @@ const statusLabel: Record<string, string> = {
 };
 
 export function AdminDashboard() {
-  const [bookings, setBookings] = useState<Array<{ id: string; customer_name: string; customer_phone: string; service_name: string; service_price: number; appointment_at: string; status: string }>>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     const loadBookings = async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("bookings")
-        .select("id,customer_name,customer_phone,service_name,service_price,appointment_at,status")
-        .order("appointment_at", { ascending: false })
-        .limit(200);
-      if (data) setBookings(data);
+      setLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const response = await fetch("/api/admin/bookings");
+        const payload = await response.json().catch(() => null) as { bookings?: Booking[]; error?: string } | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.error || "โหลดข้อมูล Dashboard ไม่สำเร็จ");
+        }
+
+        if (active) setBookings(payload?.bookings || []);
+      } catch (error) {
+        if (active) setErrorMessage(error instanceof Error ? error.message : "โหลดข้อมูล Dashboard ไม่สำเร็จ");
+      } finally {
+        if (active) setLoading(false);
+      }
     };
 
     loadBookings();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const todayBookings = useMemo(() => bookings.filter((b) => b.appointment_at.slice(0, 10) === todayIso), [bookings, todayIso]);
+  const todayIso = getBangkokDateKey(new Date());
+  const todayBookings = useMemo(() => bookings.filter((b) => getBangkokDateKey(b.appointment_at) === todayIso), [bookings, todayIso]);
   const completedToday = useMemo(() => todayBookings.filter((b) => b.status === "completed"), [todayBookings]);
   const revenueToday = useMemo(() => completedToday.reduce((sum, b) => sum + b.service_price, 0), [completedToday]);
+  const completedBookings = useMemo(() => bookings.filter((b) => b.status === "completed"), [bookings]);
+  const totalRevenue = useMemo(() => completedBookings.reduce((sum, b) => sum + b.service_price, 0), [completedBookings]);
   const avgTicket = useMemo(() => (completedToday.length ? Math.round(revenueToday / completedToday.length) : 0), [completedToday.length, revenueToday]);
 
   const dailySales = useMemo(() => {
     const dateKeys = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
+      const d = new Date(`${todayIso}T00:00:00+07:00`);
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().slice(0, 10);
+      return getBangkokDateKey(d);
     });
 
     return dateKeys.map((key) => {
-      const rows = bookings.filter((b) => b.appointment_at.slice(0, 10) === key && b.status === "completed");
+      const rows = bookings.filter((b) => getBangkokDateKey(b.appointment_at) === key && b.status === "completed");
       const revenue = rows.reduce((sum, row) => sum + row.service_price, 0);
       const label = new Date(`${key}T00:00:00`).toLocaleDateString("th-TH", { weekday: "short" });
       return { day: label, revenue, customers: rows.length };
     });
-  }, [bookings]);
+  }, [bookings, todayIso]);
 
   const recentQueue = useMemo(() => bookings.slice(0, 6).map((b) => {
     const dt = new Date(b.appointment_at);
@@ -79,7 +123,7 @@ export function AdminDashboard() {
     { label: "ยอดขายวันนี้", value: `฿${revenueToday.toLocaleString()}`, sub: `คิวเสร็จแล้ว ${completedToday.length} คน`, icon: TrendingUp, color: "#C08552" },
     { label: "ลูกค้าวันนี้", value: `${todayBookings.length} คน`, sub: `รอยืนยัน ${todayBookings.filter((b) => b.status === "pending").length} คน`, icon: Users, color: "#8C5A3C" },
     { label: "ค่าเฉลี่ยต่อบิล", value: `฿${avgTicket.toLocaleString()}`, sub: "จากคิวสำเร็จวันนี้", icon: Scissors, color: "#C08552" },
-    { label: "คิวทั้งหมด", value: `${bookings.length} รายการ`, sub: "จากฐานข้อมูลจริง", icon: Scissors, color: "#8C5A3C" },
+    { label: "ยอดขายทั้งหมด", value: `฿${totalRevenue.toLocaleString()}`, sub: `คิวทั้งหมด ${bookings.length} รายการ`, icon: Scissors, color: "#8C5A3C" },
   ];
 
   return (
@@ -88,6 +132,18 @@ export function AdminDashboard() {
         <h1 style={{ color: "#4B2E2B", fontSize: "1.5rem", fontWeight: 700 }}>Sales Dashboard</h1>
         <p className="text-sm mt-1" style={{ color: "#8C5A3C" }}>สรุปยอดการให้บริการวันนี้ — {new Date().toLocaleDateString("th-TH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
       </div>
+
+      {errorMessage && (
+        <div className="rounded-2xl px-4 py-3 text-sm" style={{ backgroundColor: "#fee2e2", color: "#991b1b" }}>
+          {errorMessage}
+        </div>
+      )}
+
+      {loading && (
+        <div className="rounded-2xl px-4 py-3 text-sm" style={{ backgroundColor: "#f5e9db", color: "#8C5A3C" }}>
+          กำลังโหลดข้อมูล Dashboard...
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s, i) => {
