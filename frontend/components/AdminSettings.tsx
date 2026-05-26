@@ -12,6 +12,25 @@ const defaultNotifications = {
   reportTime: "21:00",
 };
 
+const geminiModelOptions = [
+  "auto",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-1.5-flash",
+];
+
+const normalizeModelName = (value: string) => value.trim().toLowerCase().replace(/^models\//, "");
+
+const normalizeModelOptions = (value: unknown) => {
+  const options = Array.isArray(value) ? value : geminiModelOptions;
+  const normalized = options
+    .filter((item): item is string => typeof item === "string")
+    .map(normalizeModelName)
+    .filter((item) => item === "auto" || /^gemini-[a-z0-9.-]+$/.test(item));
+
+  return Array.from(new Set(["auto", ...normalized]));
+};
+
 type SectionProps = {
   id: "shop" | "hours" | "ai" | "notifications";
   icon: ComponentType<{ className?: string; style?: CSSProperties }>;
@@ -61,10 +80,12 @@ export function AdminSettings() {
 
   const [aiSettings, setAiSettings] = useState({
     modelName: "auto",
+    modelOptions: geminiModelOptions,
     systemPrompt: "",
     ragEnabled: false,
     ragContent: "",
   });
+  const [newModelName, setNewModelName] = useState("");
   const [ragFileName, setRagFileName] = useState<string | null>(null);
 
   const [notifications, setNotifications] = useState(defaultNotifications);
@@ -82,7 +103,7 @@ export function AdminSettings() {
 
       const data = await response.json() as {
         shop?: { shop_name?: string; address?: string; phone?: string; open_hours?: string; line_id?: string; facebook?: string } | null;
-        admin?: { telegram_enabled?: boolean; daily_report?: boolean; report_time?: string; ai_model_name?: string; ai_system_prompt?: string; rag_enabled?: boolean; rag_content?: string } | null;
+        admin?: { telegram_enabled?: boolean; daily_report?: boolean; report_time?: string; ai_model_name?: string; ai_model_options?: unknown; ai_system_prompt?: string; rag_enabled?: boolean; rag_content?: string } | null;
       };
 
       const shopData = data.shop;
@@ -117,6 +138,7 @@ export function AdminSettings() {
 
         setAiSettings({
           modelName: adminData.ai_model_name || "auto",
+          modelOptions: normalizeModelOptions(adminData.ai_model_options),
           systemPrompt: adminData.ai_system_prompt || "",
           ragEnabled: Boolean(adminData.rag_enabled),
           ragContent: adminData.rag_content || "",
@@ -164,6 +186,36 @@ export function AdminSettings() {
       ragContent: text,
       ragEnabled: true,
     }));
+  };
+
+  const addAiModel = () => {
+    const modelName = normalizeModelName(newModelName);
+
+    if (!modelName || (modelName !== "auto" && !/^gemini-[a-z0-9.-]+$/.test(modelName))) {
+      setErrorMessage("ชื่อโมเดลต้องเป็น auto หรือขึ้นต้นด้วย gemini-");
+      return;
+    }
+
+    setErrorMessage(null);
+    setAiSettings((current) => ({
+      ...current,
+      modelName,
+      modelOptions: Array.from(new Set([...current.modelOptions, modelName])),
+    }));
+    setNewModelName("");
+  };
+
+  const removeAiModel = (modelName: string) => {
+    if (modelName === "auto") return;
+
+    setAiSettings((current) => {
+      const modelOptions = current.modelOptions.filter((item) => item !== modelName);
+      return {
+        ...current,
+        modelName: current.modelName === modelName ? "auto" : current.modelName,
+        modelOptions,
+      };
+    });
   };
 
   const inputClass = "w-full px-4 py-2.5 rounded-xl text-sm outline-none";
@@ -233,14 +285,46 @@ export function AdminSettings() {
               className={inputClass}
               style={inputStyle}
             >
-              <option value="auto">Auto switch</option>
-              <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
-              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
-              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+              {aiSettings.modelOptions.map((model) => (
+                <option key={model} value={model}>{model === "auto" ? "Auto switch" : model}</option>
+              ))}
             </select>
-            <p className="text-[11px] mt-1" style={{ color: "#8C5A3C" }}>Auto จะสลับ model ให้เองตามความพร้อมใช้งานและขนาดคำถาม</p>
+            <p className="text-[11px] mt-1" style={{ color: "#8C5A3C" }}>เลือก auto เพื่อสลับ model อัตโนมัติ หรือเพิ่มชื่อโมเดล Gemini เองด้านล่าง</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                value={newModelName}
+                onChange={(e) => setNewModelName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addAiModel();
+                  }
+                }}
+                placeholder="เช่น gemini-2.5-pro"
+                className={inputClass}
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                onClick={addAiModel}
+                className="px-4 py-2.5 rounded-xl text-sm whitespace-nowrap"
+                style={{ backgroundColor: "#C08552", color: "#fff" }}
+              >
+                เพิ่มโมเดล
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {aiSettings.modelOptions.map((model) => (
+                <span key={model} className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs" style={{ backgroundColor: "#fbf4ee", color: "#4B2E2B", border: "1px solid rgba(192,133,82,0.16)" }}>
+                  {model}
+                  {model !== "auto" && (
+                    <button type="button" onClick={() => removeAiModel(model)} style={{ color: "#d4183d" }}>
+                      ลบ
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-xl p-3" style={{ backgroundColor: "#fbf4ee", border: "1px solid rgba(192,133,82,0.12)" }}>

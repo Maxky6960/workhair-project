@@ -1,4 +1,4 @@
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Calendar, User, Phone, Scissors, Clock, FileText } from "lucide-react";
@@ -22,6 +22,7 @@ const timeSlots = [
 
 export function BookPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const preService = searchParams.get("service") || "";
   const [services, setServices] = useState<Array<{ id: string; name: string; category: "men" | "women" | "other"; price: number; duration_minutes: number }>>([]);
@@ -34,12 +35,14 @@ export function BookPage() {
   });
 
   useEffect(() => {
+    const nextPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+
     const checkAuth = async () => {
       const supabase = createClient();
       const { data: authData } = await supabase.auth.getUser();
 
       if (!authData.user) {
-        router.replace("/login?next=/book");
+        router.replace(`/signup?next=${encodeURIComponent(nextPath)}`);
         return;
       }
 
@@ -61,7 +64,7 @@ export function BookPage() {
 
     checkAuth();
     fetchServices();
-  }, [router]);
+  }, [pathname, router, searchParams]);
 
   const groupedServices = useMemo(() => ({
     men: services.filter((s) => s.category === "men"),
@@ -102,7 +105,10 @@ export function BookPage() {
       const payload = await response.json().catch(() => null) as { error?: string } | null;
       setSubmitting(false);
       setErrorMessage(payload?.error?.includes("overlaps") ? "ช่วงเวลานี้มีคิวแล้ว กรุณาเลือกเวลาใหม่" : "จองไม่สำเร็จ กรุณาลองใหม่");
-      if (response.status === 401) router.replace("/login?next=/book");
+      if (response.status === 401) {
+        const nextPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+        router.replace(`/signup?next=${encodeURIComponent(nextPath)}`);
+      }
       return;
     }
 

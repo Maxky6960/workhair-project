@@ -13,6 +13,21 @@ const makeServiceClient = () => {
   });
 };
 
+const normalizeAiModelName = (value: string | undefined) => {
+  const modelName = (value || "auto").trim().toLowerCase().replace(/^models\//, "");
+  return modelName || "auto";
+};
+
+const normalizeAiModelOptions = (value: unknown) => {
+  const options = Array.isArray(value) ? value : [];
+  const normalized = options
+    .filter((item): item is string => typeof item === "string")
+    .map(normalizeAiModelName)
+    .filter((item) => item === "auto" || /^gemini-[a-z0-9.-]+$/.test(item));
+
+  return Array.from(new Set(["auto", ...normalized]));
+};
+
 async function requireAdmin() {
   const supabase = await createServerClient();
   const { data: authData } = await supabase.auth.getUser();
@@ -33,7 +48,7 @@ export async function GET() {
 
   const [{ data: shop }, { data: admin }] = await Promise.all([
     auth.supabase.from("shop_settings").select("shop_name,address,phone,open_hours,line_id,facebook").eq("id", 1).maybeSingle(),
-    auth.supabase.from("admin_settings").select("telegram_enabled,daily_report,report_time,ai_model_name,ai_system_prompt,rag_enabled,rag_content").eq("id", 1).maybeSingle(),
+    auth.supabase.from("admin_settings").select("telegram_enabled,daily_report,report_time,ai_model_name,ai_model_options,ai_system_prompt,rag_enabled,rag_content").eq("id", 1).maybeSingle(),
   ]);
 
   return NextResponse.json({ shop, admin });
@@ -47,7 +62,7 @@ export async function PUT(request: NextRequest) {
     section?: "shop" | "hours" | "ai" | "notifications";
     shopInfo?: { name?: string; address?: string; phone?: string; lineId?: string; facebook?: string };
     hours?: unknown;
-    aiSettings?: { modelName?: string; systemPrompt?: string; ragEnabled?: boolean; ragContent?: string };
+    aiSettings?: { modelName?: string; modelOptions?: unknown; systemPrompt?: string; ragEnabled?: boolean; ragContent?: string };
     notifications?: { enabled?: boolean; dailyReport?: boolean; reportTime?: string };
   };
 
@@ -89,8 +104,20 @@ export async function PUT(request: NextRequest) {
   }
 
   if (body.section === "ai") {
+    const modelName = normalizeAiModelName(body.aiSettings?.modelName);
+    const modelOptions = normalizeAiModelOptions(body.aiSettings?.modelOptions);
+
+    if (modelName !== "auto" && !/^gemini-[a-z0-9.-]+$/.test(modelName)) {
+      return NextResponse.json({ error: "Invalid Gemini model name" }, { status: 400 });
+    }
+
+    if (!modelOptions.includes(modelName)) {
+      modelOptions.push(modelName);
+    }
+
     const { error } = await writer.from("admin_settings").update({
-      ai_model_name: body.aiSettings?.modelName || "auto",
+      ai_model_name: modelName,
+      ai_model_options: modelOptions,
       ai_system_prompt: body.aiSettings?.systemPrompt || "",
       rag_enabled: Boolean(body.aiSettings?.ragEnabled),
       rag_content: body.aiSettings?.ragContent || "",

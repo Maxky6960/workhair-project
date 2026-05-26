@@ -29,7 +29,22 @@ const getErrorMessage = (searchParams?: Record<string, string | string[] | undef
   return null;
 };
 
+const getStringParam = (value?: string | string[]) => {
+  return typeof value === "string" ? value : null;
+};
+
+const getSuccessMessage = (searchParams?: Record<string, string | string[] | undefined>) => {
+  return searchParams?.registered === "1" ? "สมัครสมาชิกเรียบร้อยแล้ว กรุณาเข้าสู่ระบบ" : null;
+};
+
 export default async function Page({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
-  return <LoginPage initialErrorMessage={getErrorMessage(resolvedSearchParams)} redirectTo={safeNextPath(resolvedSearchParams?.next)} />;
+  return (
+    <LoginPage
+      initialErrorMessage={getErrorMessage(resolvedSearchParams)}
+      initialSuccessMessage={getSuccessMessage(resolvedSearchParams)}
+      initialEmail={getStringParam(resolvedSearchParams?.email)}
+      redirectTo={safeNextPath(resolvedSearchParams?.next)}
+    />
+  );
 }

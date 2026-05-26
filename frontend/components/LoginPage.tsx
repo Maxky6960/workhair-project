@@ -19,14 +19,22 @@ type SupabaseAuthErrorLike = {
 interface LoginPageProps {
   defaultTab?: "login" | "register";
   initialErrorMessage?: string | null;
+  initialSuccessMessage?: string | null;
+  initialEmail?: string | null;
   redirectTo?: string | null;
 }
 
-export function LoginPage({ defaultTab = "login", initialErrorMessage = null, redirectTo = null }: LoginPageProps) {
+export function LoginPage({
+  defaultTab = "login",
+  initialErrorMessage = null,
+  initialSuccessMessage = null,
+  initialEmail = null,
+  redirectTo = null,
+}: LoginPageProps) {
   const [tab, setTab] = useState<"login" | "register">(defaultTab);
   const [showPass, setShowPass] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(initialSuccessMessage);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -49,7 +57,9 @@ export function LoginPage({ defaultTab = "login", initialErrorMessage = null, re
     return redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : "/";
   };
 
-  const loginForm = useForm<LoginForm>();
+  const loginForm = useForm<LoginForm>({
+    defaultValues: { email: initialEmail || "" },
+  });
   const registerForm = useForm<RegisterForm>();
 
   const visibleErrorMessage = errorMessage || initialErrorMessage;
@@ -150,14 +160,21 @@ export function LoginPage({ defaultTab = "login", initialErrorMessage = null, re
       return;
     }
 
-    if (signup.session && signup.user) {
-      const landing = await resolveLanding(supabase);
-      router.push(landing);
-      router.refresh();
-    } else {
-      setTab("login");
-      setSuccessMessage("สมัครสมาชิกเรียบร้อยแล้ว กรุณาตรวจอีเมลเพื่อยืนยันบัญชี");
+    if (signup.session) {
+      await supabase.auth.signOut();
     }
+
+    const params = new URLSearchParams({
+      email: normalizedEmail,
+      registered: "1",
+    });
+
+    if (redirectTo) {
+      params.set("next", redirectTo);
+    }
+
+    router.push(`/login?${params.toString()}`);
+    router.refresh();
 
     setLoading(false);
   };

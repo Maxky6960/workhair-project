@@ -10,6 +10,7 @@ type ChatMessage = {
 
 type AdminAiSettings = {
   ai_model_name: string | null;
+  ai_model_options: string[] | null;
   ai_system_prompt: string | null;
   rag_enabled: boolean | null;
   rag_content: string | null;
@@ -37,7 +38,7 @@ const systemPrompts: Record<ChatMode, string> = {
   ].join("\n"),
 };
 
-const normalizeModelName = (value: string | null | undefined) => (value || "").trim().toLowerCase();
+const normalizeModelName = (value: string | null | undefined) => (value || "").trim().toLowerCase().replace(/^models\//, "");
 
 const chunkText = (text: string) => {
   const paragraphs = text.split(/\n\s*\n/g).map((part) => part.trim()).filter(Boolean);
@@ -151,7 +152,7 @@ async function loadAdminSettings() {
 
   const { data } = await supabase
     .from("admin_settings")
-    .select("ai_model_name,ai_system_prompt,rag_enabled,rag_content")
+    .select("ai_model_name,ai_model_options,ai_system_prompt,rag_enabled,rag_content")
     .eq("id", 1)
     .maybeSingle<AdminAiSettings>();
 
