@@ -161,7 +161,7 @@ export function LoginPage({
     }
 
     if (signup.session) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut().catch(() => null);
     }
 
     const params = new URLSearchParams({
@@ -173,7 +173,7 @@ export function LoginPage({
       params.set("next", redirectTo);
     }
 
-    router.push(`/login?${params.toString()}`);
+    router.replace(`/login?${params.toString()}`);
     router.refresh();
 
     setLoading(false);
