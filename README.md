@@ -115,7 +115,7 @@ npm run lint     # ตรวจ lint
 
 ```bash
 cd frontend
-docker compose up --build -d
+docker compose --env-file .env.production up --build -d
 ```
 
 ระบบจะเปิดใช้งานที่ port `3000`
